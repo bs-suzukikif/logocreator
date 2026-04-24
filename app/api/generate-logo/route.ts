@@ -119,27 +119,21 @@ const response = await client.images.generate({
     return Response.json({ base64: image.b64_json }, { status: 200 });
 
 } catch (error) {
-    // any を完全に排除し、想定されるエラーの形（型）を厳密に定義します
-    const err = error as { status?: number; code?: string };
+    // anyを使わずに、Azureからの本当のエラーメッセージだけを抜き出す
+    let errorMessage = "不明なエラー";
+    if (error instanceof Error) {
+      errorMessage = error.message;
+    } else {
+      errorMessage = String(error);
+    }
 
-    if (err?.status === 401) {
-      return new Response("Your API key is invalid.", {
-        status: 401,
+    return new Response(
+      `Azureエラー詳細: ${errorMessage}`,
+      {
+        status: 400, // 画面に表示させるために400のままにします
         headers: { "Content-Type": "text/plain" },
-      });
-    }
-
-    if (err?.code === "content_policy_violation" || err?.status === 400) {
-      return new Response(
-        "Your request was blocked by Azure OpenAI's content filter. Please try a different prompt.",
-        {
-          status: 400,
-          headers: { "Content-Type": "text/plain" },
-        },
-      );
-    }
-
-    throw error;
+      }
+    );
   }
 }
 
