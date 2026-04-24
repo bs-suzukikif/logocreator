@@ -102,23 +102,29 @@ export async function POST(req: Request) {
 
     Primary color is ${data.selectedPrimaryColor.toLowerCase()} and background color is ${data.selectedBackgroundColor.toLowerCase()}. The company name is ${data.companyName}, make sure to include the company name in the logo. ${data.additionalInfo ? `Additional info: ${data.additionalInfo}` : ""}`;
 
-const response = await client.images.generate({
+// 🚨 修正1: response_format を削除し、デフォルト（URL）で画像を受け取る
+    const response = await client.images.generate({
       prompt,
       model: "gpt-image-2",
       n: 1,
       size: "1024x1024",
-      response_format: "b64_json",
     });
     
-    // 🚨 追加：データが確実に存在するかどうかの安全チェック
+    // 🚨 修正2: b64_json ではなく url が入っているかチェック
     const image = response.data?.[0];
-    if (!image || !image.b64_json) {
-      throw new Error("Azure OpenAIから画像データが返されませんでした。");
+    if (!image || !image.url) {
+      throw new Error("Azure OpenAIから画像のURLが返されませんでした。");
     }
     
-    return Response.json({ base64: image.b64_json }, { status: 200 });
+    // 🚨 修正3: AzureがくれたURLから画像をダウンロードし、Base64（画面が欲しい形式）に変換する
+    const imageResponse = await fetch(image.url);
+    const arrayBuffer = await imageResponse.arrayBuffer();
+    const base64String = Buffer.from(arrayBuffer).toString('base64');
+    
+    // 画面側（フロントエンド）には、今まで通り base64 として渡す
+    return Response.json({ base64: base64String }, { status: 200 });
 
-} catch (error) {
+  } catch (error) {
     // anyを使わずに、Azureからの本当のエラーメッセージだけを抜き出す
     let errorMessage = "不明なエラー";
     if (error instanceof Error) {
@@ -130,7 +136,7 @@ const response = await client.images.generate({
     return new Response(
       `Azureエラー詳細: ${errorMessage}`,
       {
-        status: 400, // 画面に表示させるために400のままにします
+        status: 400,
         headers: { "Content-Type": "text/plain" },
       }
     );
