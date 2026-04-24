@@ -111,7 +111,7 @@ export async function POST(req: Request) {
     });
     
     return Response.json(response.data[0], { status: 200 });
-  } catch (error: any) {
+ } catch (error: any) {
     if (error?.status === 401) {
       return new Response("Your API key is invalid.", {
         status: 401,
@@ -129,7 +129,14 @@ export async function POST(req: Request) {
       );
     }
 
-    throw error;
+    // 🚨 調査用：エラーの正体をそのまま画面に返すように変更！
+    return new Response(
+      `詳細エラー: ${error?.message || error?.toString() || "不明なエラー"}`,
+      {
+        status: 500,
+        headers: { "Content-Type": "text/plain" },
+      }
+    );
   }
 }
 
