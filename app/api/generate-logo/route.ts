@@ -113,8 +113,8 @@ export async function POST(req: Request) {
     return Response.json({ base64: response.data[0].b64_json }, { status: 200 });
 
 } catch (error) {
-    // TypeScriptの警告（any禁止）を回避しつつエラー情報を読み取る
-    const err = error as Record<string, any>;
+    // any を完全に排除し、想定されるエラーの形（型）を厳密に定義します
+    const err = error as { status?: number; code?: string };
 
     if (err?.status === 401) {
       return new Response("Your API key is invalid.", {
@@ -133,7 +133,6 @@ export async function POST(req: Request) {
       );
     }
 
-    // 上記以外の想定外のエラーは、本来の仕様通りそのまま投げる（throw）
     throw error;
   }
 }
