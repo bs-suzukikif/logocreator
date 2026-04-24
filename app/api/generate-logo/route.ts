@@ -26,17 +26,15 @@ export async function POST(req: Request) {
     })
     .parse(json);
 
-  // Upstashによるレート制限（設定されている場合）
   if (process.env.UPSTASH_REDIS_REST_URL && !data.userAPIKey) {
     ratelimit = new Ratelimit({
       redis: Redis.fromEnv(),
-      limiter: Ratelimit.fixedWindow(3, "60 d"),
+      limiter: Ratelimit.fixedWindow(999, "60 d"),
       analytics: true,
       prefix: "logocreator",
     });
   }
 
-  // Azure OpenAI クライアントの初期化
   const client = new AzureOpenAI({
     endpoint: process.env.AZURE_OPENAI_ENDPOINT!,
     apiKey: data.userAPIKey || process.env.AZURE_OPENAI_API_KEY!,
@@ -98,19 +96,17 @@ export async function POST(req: Request) {
     Minimal: minimalStyle,
   };
 
-  // 会社名の描画精度を上げるため、${data.companyName} をシングルクォーテーションで囲んでいます
+  // プロンプトの文字列をオリジナルのコードと全く同じ状態に復元しました
   const prompt = dedent`A single logo, high-quality, award-winning professional design, made for both digital and print media, only contains a few vector shapes, ${styleLookup[data.selectedStyle]}
 
-  Primary color is ${data.selectedPrimaryColor.toLowerCase()} and background color is ${data.selectedBackgroundColor.toLowerCase()}. The company name is '${data.companyName}', make sure to include the company name in the logo perfectly. ${data.additionalInfo ? `Additional info: ${data.additionalInfo}` : ""}`;
+  Primary color is ${data.selectedPrimaryColor.toLowerCase()} and background color is ${data.selectedBackgroundColor.toLowerCase()}. The company name is ${data.companyName}, make sure to include the company name in the logo. ${data.additionalInfo ? `Additional info: ${data.additionalInfo}` : ""}`;
 
   try {
-    // gpt-image-2 モデルで画像を生成
     const response = await client.images.generate({
       prompt,
-      model: "gpt-image-2", // DALL-E 3の指定を外し、完全に固定
+      model: "gpt-image-2",
       n: 1,
-      // OpenAIの画像生成は 256x256, 512x512, 1024x1024 のみサポートのため、元の768ではなく1024を指定
-      size: "1024x1024", 
+      size: "1024x1024",
       response_format: "b64_json",
     });
     
