@@ -112,17 +112,29 @@ export async function POST(req: Request) {
     
     return Response.json({ base64: response.data[0].b64_json }, { status: 200 });
 
-  } catch (error: any) {
-    // 🚨 どこでエラーが起きても、ここでキャッチして画面に返す
-    const errorMessage = error?.message || error?.toString() || JSON.stringify(error);
-    
-    return new Response(
-      `詳細エラー: ${errorMessage}`,
-      {
-        status: 400,
+} catch (error) {
+    // TypeScriptの警告（any禁止）を回避しつつエラー情報を読み取る
+    const err = error as Record<string, any>;
+
+    if (err?.status === 401) {
+      return new Response("Your API key is invalid.", {
+        status: 401,
         headers: { "Content-Type": "text/plain" },
-      }
-    );
+      });
+    }
+
+    if (err?.code === "content_policy_violation" || err?.status === 400) {
+      return new Response(
+        "Your request was blocked by Azure OpenAI's content filter. Please try a different prompt.",
+        {
+          status: 400,
+          headers: { "Content-Type": "text/plain" },
+        },
+      );
+    }
+
+    // 上記以外の想定外のエラーは、本来の仕様通りそのまま投げる（throw）
+    throw error;
   }
 }
 
