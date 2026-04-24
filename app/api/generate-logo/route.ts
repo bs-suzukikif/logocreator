@@ -110,7 +110,7 @@ export async function POST(req: Request) {
       response_format: "b64_json",
     });
     
-    return Response.json({ base64: response.data[0].b64_json }, { status: 200 });
+    return Response.json(response.data[0], { status: 200 });
   } catch (error: any) {
     if (error?.status === 401) {
       return new Response("Your API key is invalid.", {
