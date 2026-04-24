@@ -119,7 +119,7 @@ export async function POST(req: Request) {
     return new Response(
       `詳細エラー: ${errorMessage}`,
       {
-        status: 500,
+        status: 400,
         headers: { "Content-Type": "text/plain" },
       }
     );
