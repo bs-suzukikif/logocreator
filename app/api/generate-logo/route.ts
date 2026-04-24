@@ -102,7 +102,7 @@ export async function POST(req: Request) {
 
     Primary color is ${data.selectedPrimaryColor.toLowerCase()} and background color is ${data.selectedBackgroundColor.toLowerCase()}. The company name is ${data.companyName}, make sure to include the company name in the logo. ${data.additionalInfo ? `Additional info: ${data.additionalInfo}` : ""}`;
 
-    const response = await client.images.generate({
+const response = await client.images.generate({
       prompt,
       model: "gpt-image-2",
       n: 1,
@@ -110,7 +110,13 @@ export async function POST(req: Request) {
       response_format: "b64_json",
     });
     
-    return Response.json({ base64: response.data[0].b64_json }, { status: 200 });
+    // 🚨 追加：データが確実に存在するかどうかの安全チェック
+    const image = response.data?.[0];
+    if (!image || !image.b64_json) {
+      throw new Error("Azure OpenAIから画像データが返されませんでした。");
+    }
+    
+    return Response.json({ base64: image.b64_json }, { status: 200 });
 
 } catch (error) {
     // any を完全に排除し、想定されるエラーの形（型）を厳密に定義します
