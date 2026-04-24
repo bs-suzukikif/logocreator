@@ -112,10 +112,16 @@ export async function POST(req: Request) {
     
     return Response.json(response.data[0], { status: 200 });
 } catch (error: any) {
-    if (error?.status === 401) { ... }
-    if (error?.code === "content_policy_violation" || error?.status === 400) { ... }
-
-    throw error; // ← ここが原因で詳細が隠れています
+    // 🚨 調査用：何のエラーが起きても、必ず画面にテキストとして原因を出力する
+    const errorMessage = error?.message || error?.toString() || JSON.stringify(error);
+    
+    return new Response(
+      `詳細エラー: ${errorMessage}`,
+      {
+        status: 500,
+        headers: { "Content-Type": "text/plain" },
+      }
+    );
   }
 }
 
