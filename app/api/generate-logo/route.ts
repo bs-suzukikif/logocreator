@@ -102,30 +102,27 @@ export async function POST(req: Request) {
 
     Primary color is ${data.selectedPrimaryColor.toLowerCase()} and background color is ${data.selectedBackgroundColor.toLowerCase()}. The company name is ${data.companyName}, make sure to include the company name in the logo. ${data.additionalInfo ? `Additional info: ${data.additionalInfo}` : ""}`;
 
-// 🚨 修正1: response_format を削除し、デフォルト（URL）で画像を受け取る
+// 🚨 修正1: 画像サイズを 512x512 にして生成スピードを爆速にする
     const response = await client.images.generate({
       prompt,
       model: "gpt-image-2",
       n: 1,
-      size: "1024x1024",
+      size: "512x512", // 👈 ここを小さくしました！
     });
     
-    // 🚨 修正2: b64_json ではなく url が入っているかチェック
     const image = response.data?.[0];
     if (!image || !image.url) {
       throw new Error("Azure OpenAIから画像のURLが返されませんでした。");
     }
     
-    // 🚨 修正3: AzureがくれたURLから画像をダウンロードし、Base64（画面が欲しい形式）に変換する
+    // AzureがくれたURLから画像をダウンロードし、Base64に変換する
     const imageResponse = await fetch(image.url);
     const arrayBuffer = await imageResponse.arrayBuffer();
     const base64String = Buffer.from(arrayBuffer).toString('base64');
     
-    // 画面側（フロントエンド）には、今まで通り base64 として渡す
     return Response.json({ base64: base64String }, { status: 200 });
 
   } catch (error) {
-    // anyを使わずに、Azureからの本当のエラーメッセージだけを抜き出す
     let errorMessage = "不明なエラー";
     if (error instanceof Error) {
       errorMessage = error.message;
@@ -143,4 +140,4 @@ export async function POST(req: Request) {
   }
 }
 
-export const runtime = "edge";
+// 🚨 修正2: 一番下にあった `export const runtime = "edge";` は完全に削除しました！
