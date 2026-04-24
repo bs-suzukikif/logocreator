@@ -111,32 +111,11 @@ export async function POST(req: Request) {
     });
     
     return Response.json(response.data[0], { status: 200 });
- } catch (error: any) {
-    if (error?.status === 401) {
-      return new Response("Your API key is invalid.", {
-        status: 401,
-        headers: { "Content-Type": "text/plain" },
-      });
-    }
+} catch (error: any) {
+    if (error?.status === 401) { ... }
+    if (error?.code === "content_policy_violation" || error?.status === 400) { ... }
 
-    if (error?.code === "content_policy_violation" || error?.status === 400) {
-      return new Response(
-        "Your request was blocked by Azure OpenAI's content filter. Please try a different prompt.",
-        {
-          status: 400,
-          headers: { "Content-Type": "text/plain" },
-        },
-      );
-    }
-
-    // 🚨 調査用：エラーの正体をそのまま画面に返すように変更！
-    return new Response(
-      `詳細エラー: ${error?.message || error?.toString() || "不明なエラー"}`,
-      {
-        status: 500,
-        headers: { "Content-Type": "text/plain" },
-      }
-    );
+    throw error; // ← ここが原因で詳細が隠れています
   }
 }
 
