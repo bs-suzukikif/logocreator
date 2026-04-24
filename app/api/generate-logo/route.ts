@@ -102,13 +102,11 @@ export async function POST(req: Request) {
 
     Primary color is ${data.selectedPrimaryColor.toLowerCase()} and background color is ${data.selectedBackgroundColor.toLowerCase()}. The company name is ${data.companyName}, make sure to include the company name in the logo. ${data.additionalInfo ? `Additional info: ${data.additionalInfo}` : ""}`;
 
-    // 816x816 は要件（655,360ピクセル以上、16の倍数）を完璧にクリアしています！
-    // ※SDKの型エラーを回避するため、as "1024x1024" でTypeScriptを騙して通します
     const response = await client.images.generate({
       prompt,
       model: "gpt-image-2",
       n: 1,
-      size: "816x816" as "1024x1024", 
+      size: "1024x1024", // ここは必ず1024x1024にします
     });
     
     const image = response.data?.[0];
@@ -116,12 +114,8 @@ export async function POST(req: Request) {
       throw new Error("Azure OpenAIから画像のURLが返されませんでした。");
     }
     
-    // AzureがくれたURLから画像をダウンロードし、Base64に変換する
-    const imageResponse = await fetch(image.url);
-    const arrayBuffer = await imageResponse.arrayBuffer();
-    const base64String = Buffer.from(arrayBuffer).toString('base64');
-    
-    return Response.json({ base64: base64String }, { status: 200 });
+    // 🚨 タイムアウト対策：重いダウンロード処理を全削除し、URLを直接画面に返す！
+    return Response.json({ url: image.url }, { status: 200 });
 
   } catch (error) {
     let errorMessage = "不明なエラー";
@@ -140,5 +134,3 @@ export async function POST(req: Request) {
     );
   }
 }
-
-// 🚨 修正2: 一番下にあった `export const runtime = "edge";` は完全に削除しました！
