@@ -2,7 +2,7 @@ import { clerkClient, currentUser } from "@clerk/nextjs/server";
 import { Ratelimit } from "@upstash/ratelimit";
 import { Redis } from "@upstash/redis";
 import dedent from "dedent";
-import Together from "together-ai";
+import { AzureOpenAI } from "openai";
 import { z } from "zod";
 
 let ratelimit: Ratelimit | undefined;
@@ -19,7 +19,6 @@ export async function POST(req: Request) {
     .object({
       userAPIKey: z.string().optional(),
       companyName: z.string(),
-      // selectedLayout: z.string(),
       selectedStyle: z.string(),
       selectedPrimaryColor: z.string(),
       selectedBackgroundColor: z.string(),
@@ -27,31 +26,24 @@ export async function POST(req: Request) {
     })
     .parse(json);
 
-  // Add observability if a Helicone key is specified, otherwise skip
-  const options: ConstructorParameters<typeof Together>[0] = {};
-  if (process.env.HELICONE_API_KEY) {
-    options.baseURL = "https://together.helicone.ai/v1";
-    options.defaultHeaders = {
-      "Helicone-Auth": `Bearer ${process.env.HELICONE_API_KEY}`,
-      "Helicone-Property-LOGOBYOK": data.userAPIKey ? "true" : "false",
-    };
-  }
-
-  // Add rate limiting if Upstash API keys are set & no BYOK, otherwise skip
+  // Upstashによるレート制限（設定されている場合）
   if (process.env.UPSTASH_REDIS_REST_URL && !data.userAPIKey) {
     ratelimit = new Ratelimit({
       redis: Redis.fromEnv(),
-      // Allow 3 requests per 2 months on prod
       limiter: Ratelimit.fixedWindow(3, "60 d"),
       analytics: true,
       prefix: "logocreator",
     });
   }
 
-  const client = new Together(options);
+  // Azure OpenAI クライアントの初期化
+  const client = new AzureOpenAI({
+    endpoint: process.env.AZURE_OPENAI_ENDPOINT!,
+    apiKey: data.userAPIKey || process.env.AZURE_OPENAI_API_KEY!,
+    apiVersion: "2024-02-15-preview",
+  });
 
   if (data.userAPIKey) {
-    client.apiKey = data.userAPIKey;
     (await clerkClient()).users.updateUserMetadata(user.id, {
       unsafeMetadata: {
         remaining: "BYOK",
@@ -70,7 +62,7 @@ export async function POST(req: Request) {
 
     if (!success) {
       return new Response(
-        "You've used up all your credits. Enter your own Together API Key to generate more logos.",
+        "You've used up all your credits. Enter your own API Key to generate more logos.",
         {
           status: 429,
           headers: { "Content-Type": "text/plain" },
@@ -106,49 +98,36 @@ export async function POST(req: Request) {
     Minimal: minimalStyle,
   };
 
+  // 会社名の描画精度を上げるため、${data.companyName} をシングルクォーテーションで囲んでいます
   const prompt = dedent`A single logo, high-quality, award-winning professional design, made for both digital and print media, only contains a few vector shapes, ${styleLookup[data.selectedStyle]}
 
-  Primary color is ${data.selectedPrimaryColor.toLowerCase()} and background color is ${data.selectedBackgroundColor.toLowerCase()}. The company name is ${data.companyName}, make sure to include the company name in the logo. ${data.additionalInfo ? `Additional info: ${data.additionalInfo}` : ""}`;
+  Primary color is ${data.selectedPrimaryColor.toLowerCase()} and background color is ${data.selectedBackgroundColor.toLowerCase()}. The company name is '${data.companyName}', make sure to include the company name in the logo perfectly. ${data.additionalInfo ? `Additional info: ${data.additionalInfo}` : ""}`;
 
   try {
-    const response = await client.images.create({
+    // gpt-image-2 モデルで画像を生成
+    const response = await client.images.generate({
       prompt,
-      model: "black-forest-labs/FLUX.1.1-pro",
-      width: 768,
-      height: 768,
-      // @ts-expect-error - this is not typed in the API
-      response_format: "base64",
+      model: "gpt-image-2", // DALL-E 3の指定を外し、完全に固定
+      n: 1,
+      // OpenAIの画像生成は 256x256, 512x512, 1024x1024 のみサポートのため、元の768ではなく1024を指定
+      size: "1024x1024", 
+      response_format: "b64_json",
     });
-    return Response.json(response.data[0], { status: 200 });
-  } catch (error) {
-    const invalidApiKey = z
-      .object({
-        error: z.object({
-          error: z.object({ code: z.literal("invalid_api_key") }),
-        }),
-      })
-      .safeParse(error);
-
-    if (invalidApiKey.success) {
+    
+    return Response.json({ base64: response.data[0].b64_json }, { status: 200 });
+  } catch (error: any) {
+    if (error?.status === 401) {
       return new Response("Your API key is invalid.", {
         status: 401,
         headers: { "Content-Type": "text/plain" },
       });
     }
 
-    const modelBlocked = z
-      .object({
-        error: z.object({
-          error: z.object({ type: z.literal("request_blocked") }),
-        }),
-      })
-      .safeParse(error);
-
-    if (modelBlocked.success) {
+    if (error?.code === "content_policy_violation" || error?.status === 400) {
       return new Response(
-        "Your Together AI account needs to be in Build Tier 2 ($50 credit pack purchase required) to use this model. Please make a purchase at: https://api.together.xyz/settings/billing",
+        "Your request was blocked by Azure OpenAI's content filter. Please try a different prompt.",
         {
-          status: 403,
+          status: 400,
           headers: { "Content-Type": "text/plain" },
         },
       );
