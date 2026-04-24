@@ -102,12 +102,13 @@ export async function POST(req: Request) {
 
     Primary color is ${data.selectedPrimaryColor.toLowerCase()} and background color is ${data.selectedBackgroundColor.toLowerCase()}. The company name is ${data.companyName}, make sure to include the company name in the logo. ${data.additionalInfo ? `Additional info: ${data.additionalInfo}` : ""}`;
 
-// 🚨 修正1: 画像サイズを 512x512 にして生成スピードを爆速にする
+    // 816x816 は要件（655,360ピクセル以上、16の倍数）を完璧にクリアしています！
+    // ※SDKの型エラーを回避するため、as "1024x1024" でTypeScriptを騙して通します
     const response = await client.images.generate({
       prompt,
       model: "gpt-image-2",
       n: 1,
-      size: "512x512", // 👈 ここを小さくしました！
+      size: "816x816" as "1024x1024", 
     });
     
     const image = response.data?.[0];
