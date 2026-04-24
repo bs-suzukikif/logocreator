@@ -102,7 +102,7 @@ export default function Page() {
 
     if (res.ok) {
       const json = await res.json();
-      setGeneratedImage(json.url); // 👈 Base64ではなく、APIから来たURLをそのまま画像としてセットします！
+      setGeneratedImage(`data:image/png;base64,${json.b64_json}`);
       await user.reload();
     } else if (res.headers.get("Content-Type") === "text/plain") {
       toast({
